@@ -1,0 +1,129 @@
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import webbrowser
+import winsound
+import os  # NEW: Library to interact with the Operating System
+
+# Initialize
+listener = sr.Recognizer()
+engine = pyttsx3.init()
+
+# SETTING: 1.5 second delay to wait for you to finish speaking
+listener.pause_threshold = 1.5 
+
+# NEW: Dictionary to map your voice commands to system process names
+# You can add more apps here following the format 'voice name': 'system_name.exe'
+app_dict = {
+    'notepad': 'notepad.exe',
+    'calculator': 'calc.exe',
+    'chrome': 'chrome.exe',
+    'command prompt': 'cmd.exe',
+    'excel': 'excel.exe'
+}
+
+def talk(text):
+    """Function to make the assistant speak"""
+    engine.say(text)
+    engine.runAndWait()
+
+def take_command():
+    """Function to listen to the microphone"""
+    try:
+        with sr.Microphone() as source:
+            print("Listening...")
+            
+            # STARTING SOUND (Beep)
+            winsound.Beep(1000, 200) 
+            
+            listener.adjust_for_ambient_noise(source)
+            voice = listener.listen(source)
+            command = listener.recognize_google(voice)
+            command = command.lower()
+            
+            if 'alexa' in command:
+                command = command.replace('alexa', '')
+            return command.strip()
+            
+    except sr.UnknownValueError:
+        return ""
+    except Exception as e:
+        print(f"Error: {e}")
+        return ""
+
+def open_application(command):
+    """Check if the user wants to open an app from our dictionary"""
+    for app_name, process_name in app_dict.items():
+        if app_name in command:
+            talk(f"Opening {app_name}")
+            try:
+                # os.system(f"start {process_name}") works for system path apps
+                os.system(f"start {process_name}")
+                return True
+            except Exception as e:
+                talk(f"I could not open {app_name}")
+                return True
+    return False
+
+def close_application(command):
+    """Check if the user wants to close an app"""
+    for app_name, process_name in app_dict.items():
+        if app_name in command:
+            talk(f"Closing {app_name}")
+            try:
+                # 'taskkill' is the Windows command to force close a program
+                os.system(f"taskkill /f /im {process_name}")
+                return True
+            except Exception as e:
+                talk(f"I could not close {app_name}")
+                return True
+    return False
+
+def run_alexa():
+    """Main logic"""
+    command = take_command()
+    
+    if command == "":
+        return
+
+    print(f"User said: {command}") 
+
+    # 1. Check for basic commands
+    if 'time' in command:
+        time = datetime.datetime.now().strftime('%I:%M %p')
+        print(time)
+        talk('Current time is ' + time)
+        
+    elif 'youtube' in command:
+        song = command.replace('youtube', '')
+        talk('Playing ' + song)
+        webbrowser.open(f"https://www.youtube.com/results?search_query={song}")
+
+    elif 'hello' in command:
+        talk("Hello! I am ready to help.")
+
+    elif 'stop' in command or 'exit' in command:
+        talk("Turning off. Goodbye.")
+        exit()
+
+    # 2. Check for OPEN commands
+    elif 'open' in command:
+        # If open_application returns False (app not found), we continue to search
+        if not open_application(command):
+             talk("I don't know that application yet.")
+
+    # 3. Check for CLOSE commands
+    elif 'close' in command:
+        if not close_application(command):
+            talk("I don't know that application yet.")
+        
+    # 4. Fallback: Google Search
+    else:
+        talk(f'Searching Google for {command}')
+        webbrowser.open(f"https://google.com/search?q={command}")
+
+# Main Loop
+if __name__ == "__main__":
+    talk("System online.")
+    while True:
+        run_alexa()
